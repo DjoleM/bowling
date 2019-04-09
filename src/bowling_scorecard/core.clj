@@ -18,7 +18,7 @@
   [req]
   (let [id (uuid)]
     (swap! scorecards assoc id [])
-    (response id))
+    (response id)))
 
 (defn get-all-scorecards
   "Returns a list of all known scorecard ids"
@@ -66,8 +66,20 @@
   (context "/scorecard" [] scorecard-routes)
   (route/not-found "Not Found"))
 
+;; DEBUG ONLY, NUKE LATER
+(defn print-req
+  [req]
+  (println req)
+  "success")
+
+(defroutes print-routes
+  (GET "/" [] print-req)
+  (POST "/" [] print-req))
+;; -- END DEBUG --
+
 (defroutes app-routes
   (context "/v1" [] v1-routes)
+  (context "/print" [] print-routes)
   (GET  "/" [] "we're live")
   (route/not-found "Not Found"))
 
