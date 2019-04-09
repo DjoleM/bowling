@@ -13,6 +13,11 @@
 ;; of the lifespan of the server
 (def scorecards (atom {}))
 
+(defn get-score-from-scorecard
+  "Calculates and returns the total score form a scorecard"
+  [id]
+  0)
+
 (defn create-new-scorecard
   "Creates a new sorecard and returns the uuid"
   [req]
@@ -26,18 +31,22 @@
   (response
     (keys @scorecards)))
 
+(defn get-scorecard-by-id
+  "Returns a scorecard by id"
+  [id]
+  (get @scorecards id))
+
 (defn get-scorecard
-  "Returns an unformatted scorecard by id"
+  "Gets a scorecard by id from a request"
   [req]
   (response
-    (get @scorecards (-> req :params :scorecard-id))))
-
+    (get-scorecard-by-id (-> req :params :scorecard-id))))
 
 ;; Helper function to quickly extract and parse integer values
 ;; While also catching spares ('/') and strikes ('x')
 (defn extract-score-from-request
   "Extacts scores in an int or string format form post request by name"
-  [req, param]
+  [req param]
   (try
     (Integer/parseInt
       (get (req :form-params) param))
@@ -47,8 +56,8 @@
 ;; and saves it to the scorecard atom
 (defn save-frame
   "Saves a frame to scorecard"
-  [id, frame]
-  (swap! scorecards assoc-in [id (count (get @scorecards id))] frame))
+  [id frame]
+  (swap! scorecards assoc-in [id (count (get-scorecard-by-id id))] frame))
 
 ;; Due to time restriction and the nature of usage
 ;; we will assume the data provided to be correct and
@@ -56,14 +65,19 @@
 (defn add-frame
   "Adds a new score frame to scorecard"
   [req]
-    (let 
-      [frame (vec
-              (remove nil? 
-                [(extract-score-from-request req "first")
-                  (extract-score-from-request req "second")
-                  (extract-score-from-request req "third")]))]
-      (save-frame (-> req :params :scorecard-id) frame)
-      (response frame)))
+    (let [id (-> req :params :scorecard-id)]
+      (if (> (count (get-scorecard-by-id id)) 9)
+        (response "Error: game already done")
+        (let 
+          [frame (vec
+                  (remove nil? 
+                    [(extract-score-from-request req "first")
+                      (extract-score-from-request req "second")
+                      (extract-score-from-request req "third")]))]
+          (save-frame id frame)
+          (if (= (count (get-scorecard-by-id id)) 10)
+            (response {"Total Score" (get-score-from-scorecard id) "Scorecard" (get-scorecard-by-id id)})
+            (response frame))))))
 
 ;; Posible functions for individial frames
 (defroutes frame-routes
