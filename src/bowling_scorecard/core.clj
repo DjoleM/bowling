@@ -32,6 +32,39 @@
   (response
     (get @scorecards (-> req :params :scorecard-id))))
 
+
+;; Helper function to quickly extract and parse integer values
+;; While also catching spares ('/') and strikes ('x')
+(defn extract-score-from-request
+  "Extacts scores in an int or string format form post request by name"
+  [req, param]
+  (try
+    (Integer/parseInt
+      (get (req :form-params) param))
+    (catch Exception e (get (req :form-params) param))))
+
+;; Helper function that takes in a constructed frame
+;; and saves it to the scorecard atom
+(defn save-frame
+  "Saves a frame to scorecard"
+  [id, frame]
+  (swap! scorecards assoc-in [id (count (get @scorecards id))] frame))
+
+;; Due to time restriction and the nature of usage
+;; we will assume the data provided to be correct and
+;; well formatted    
+(defn add-frame
+  "Adds a new score frame to scorecard"
+  [req]
+    (let 
+      [frame (vec
+              (remove nil? 
+                [(extract-score-from-request req "first")
+                  (extract-score-from-request req "second")
+                  (extract-score-from-request req "third")]))]
+      (save-frame (-> req :params :scorecard-id) frame)
+      (response frame)))
+
 ;; Posible functions for individial frames
 (defroutes frame-routes
   (GET "/" [] "get frame")
@@ -47,7 +80,7 @@
   ;; retreives the scorecard itself
   (GET "/" [] get-scorecard)
   ;; Adds the next frame to the scorecard
-  (POST "/" [] "adding a frame to scorecard")
+  (POST "/" [] add-frame)
   #_(DELETE "/" [] "Deleting a frame form scorecard")
   (route/not-found "No such scorecard operation found"))
 
