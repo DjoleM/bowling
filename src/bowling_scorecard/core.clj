@@ -46,14 +46,14 @@
         ;; Bad luck joe :(
         (apply + frame)))))
 
-(defn get-score-from-scorecard
+(defn get-score-for-scorecard
   "Calculates and returns the total score form a scorecard"
-  [id]
+  [scorecard]
   (loop [i 0
         scores []]
     (if-not (< i 9)
-      (reduce + (conj scores (get-score-for-last-frame (get @scorecards id))))
-      (recur (inc i) (conj scores (get-score-for-frame (get @scorecards id) i))))))
+      (reduce + (conj scores (get-score-for-last-frame scorecard)))
+      (recur (inc i) (conj scores (get-score-for-frame scorecard i))))))
 
 (defn create-new-scorecard
   "Creates a new sorecard and returns the uuid"
@@ -113,7 +113,7 @@
                      (extract-score-from-request req "third")]))]
           (save-frame id frame)
           (if (= (count (get-scorecard-by-id id)) 10)
-            (response {"Total Score" (get-score-from-scorecard id) "Scorecard" (get-scorecard-by-id id)})
+            (response {"Total Score" (get-score-for-scorecard (get @scorecards id)) "Scorecard" (get-scorecard-by-id id)})
             (response (get @scorecards id)))))))
 
 ;; Posible functions for individial frames
