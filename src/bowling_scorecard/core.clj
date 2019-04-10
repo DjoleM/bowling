@@ -13,10 +13,47 @@
 ;; of the lifespan of the server
 (def scorecards (atom {}))
 
+(defn get-score-for-spare
+  "Calculates the total value of a spare"
+  [scorecard frame-order]
+  (+ 10 (get-in scorecard [(inc frame-order) 0])))
+
+(defn get-score-for-strike
+  "Calculates the total value of a strike"
+  [scorecard frame-order]
+  (let [next-frame (get scorecard (inc frame-order))]
+    (if (nil? (get next-frame 1))
+      ;;Next frame doesn't have a second bowl
+      ;;Add strike 10 + first from next 2 frames
+      (+ 10 (get next-frame 0) (get-in scorecard [(inc frame-order) 0]))
+      (+ 10 (get next-frame 0) (get next-frame 1)))))
+
+(defn get-score-for-last-frame
+  "Calculates the sum of the last frame"
+  [scorecard]
+  (apply + (get scorecard 9)))
+
+(defn get-score-for-frame
+  "Calculates the score for a regular frame"
+  [scorecard frame-order]
+  (let [frame (get scorecard frame-order)]
+    (if (= (get frame 0) 10)
+      ;; Strike
+      (get-score-for-strike scorecard frame-order)
+      (if (= (+ (get frame 0) (get frame 1)) 10)
+        ;; spare
+        (get-score-for-spare scorecard frame-order)
+        ;; Bad luck joe :(
+        (apply + frame)))))
+
 (defn get-score-from-scorecard
   "Calculates and returns the total score form a scorecard"
   [id]
-  0)
+  (loop [i 0
+        scores []]
+    (if-not (< i 9)
+      (reduce + (conj scores (get-score-for-last-frame (get @scorecards id))))
+      (recur (inc i) (conj scores (get-score-for-frame (get @scorecards id) i))))))
 
 (defn create-new-scorecard
   "Creates a new sorecard and returns the uuid"
@@ -50,7 +87,7 @@
   (try
     (Integer/parseInt
       (get (req :form-params) param))
-    (catch Exception e (get (req :form-params) param))))
+    (catch Exception e nil)))
 
 ;; Helper function that takes in a constructed frame
 ;; and saves it to the scorecard atom
@@ -72,12 +109,12 @@
           [frame (vec
                   (remove nil? 
                     [(extract-score-from-request req "first")
-                      (extract-score-from-request req "second")
-                      (extract-score-from-request req "third")]))]
+                     (extract-score-from-request req "second")
+                     (extract-score-from-request req "third")]))]
           (save-frame id frame)
           (if (= (count (get-scorecard-by-id id)) 10)
             (response {"Total Score" (get-score-from-scorecard id) "Scorecard" (get-scorecard-by-id id)})
-            (response frame))))))
+            (response (get @scorecards id)))))))
 
 ;; Posible functions for individial frames
 (defroutes frame-routes
@@ -113,20 +150,8 @@
   (context "/scorecard" [] scorecard-routes)
   (route/not-found "Not Found"))
 
-;; DEBUG ONLY, NUKE LATER
-(defn print-req
-  [req]
-  (println req)
-  "success")
-
-(defroutes print-routes
-  (GET "/" [] print-req)
-  (POST "/" [] print-req))
-;; -- END DEBUG --
-
 (defroutes app-routes
   (context "/v1" [] v1-routes)
-  (context "/print" [] print-routes)
   (GET  "/" [] "we're live")
   (route/not-found "Not Found"))
 
